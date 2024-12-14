@@ -1,6 +1,12 @@
 @echo off
 echo Setting up Conda environment for Ollama testing...
 
+:: 设置环境变量
+set OLLAMA_ROOT=D:\ollama-server
+set OLLAMA_MODELS=%OLLAMA_ROOT%\models
+set OLLAMA_CACHE=%OLLAMA_ROOT%\cache
+set PATH=%OLLAMA_ROOT%\bin;%PATH%
+
 :: 检查是否安装了 Conda
 where conda >nul 2>nul
 if %errorlevel% neq 0 (

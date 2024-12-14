@@ -1,0 +1,15 @@
+# 使用之前的modelfile内容
+FROM qwen:7b-chat
+
+# 系统参数配置
+PARAMETER temperature 0.7
+PARAMETER top_p 0.9
+PARAMETER top_k 40
+PARAMETER repeat_penalty 1.1
+PARAMETER num_ctx 2048
+
+# 系统提示语配置
+SYSTEM You are a helpful AI assistant based on Qwen language model.
+
+# 设置模型名称
+SET name qwen-chat

@@ -2,6 +2,15 @@
 chcp 65001
 setlocal enabledelayedexpansion
 
+:: 设置根目录
+set OLLAMA_ROOT=D:\ollama-server
+set RESULTS_DIR=%OLLAMA_ROOT%\logs\test_results
+
+:: 创建结果目录
+if not exist "%RESULTS_DIR%" mkdir "%RESULTS_DIR%"
+set "timestamp=%date:~0,4%%date:~5,2%%date:~8,2%_%time:~0,2%%time:~3,2%%time:~6,2%"
+set "result_file=%RESULTS_DIR%\test_results_%timestamp%.txt"
+
 :: 激活 Conda 环境
 call conda activate ollama_test
 
@@ -13,11 +22,6 @@ if %errorlevel% neq 0 (
     exit /b
 )
 
-:: 创建结果目录
-if not exist "results" mkdir results
-set "timestamp=%date:~0,4%%date:~5,2%%date:~8,2%_%time:~0,2%%time:~3,2%%time:~6,2%"
-set "timestamp=%timestamp: =0%"
-set "result_file=results\test_results_%timestamp%.txt"
 
 echo Ollama API Test Report - %date% %time% > %result_file%
 echo ================================================== >> %result_file%
