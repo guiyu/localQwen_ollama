@@ -15,7 +15,7 @@ set "result_file=%RESULTS_DIR%\test_results_%timestamp%.txt"
 call conda activate ollama_test
 
 :: 检查环境
-python check_env.py
+python check_env.bat
 if %errorlevel% neq 0 (
     echo Environment check failed. Please run setup_env.bat first.
     pause
