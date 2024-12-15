@@ -1,0 +1,29 @@
+{
+    "vps_host": "your-vps-ip",
+    "vps_user": "root",
+    "ssh_key_path": "/path/to/ssh/key",
+    "domain": "your-domain.com",
+    "email": "admin@yourdomain.com",
+    "backends": [
+        {
+            "host": "windows-server-ip",
+            "port": 11434,
+            "weight": 100,
+            "max_conn": 1000
+        }
+    ],
+    "ssl": {
+        "enabled": true,
+        "cert_path": "/etc/ssl/private/ollama.pem"
+    },
+    "monitoring": {
+        "enabled": true,
+        "interval": 60,
+        "alerts": {
+            "email": "admin@yourdomain.com",
+            "max_connections": 1000,
+            "max_cpu_usage": 80,
+            "max_memory_usage": 80
+        }
+    }
+}
