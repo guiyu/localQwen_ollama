@@ -1,5 +1,5 @@
 param(
-    [string]$VpsIp = "64.69.37.169",
+    [string]$VpsIp = "192.3.59.148",
     [string]$VpsUser = "root",
     [int]$LocalPort = 11434,
     [int]$RemotePort = 11434
