@@ -3,153 +3,153 @@ chcp 65001
 setlocal enabledelayedexpansion
 
 :: 设置根目录
-set OLLAMA_ROOT=D:\ollama-server
-set RESULTS_DIR=%OLLAMA_ROOT%\logs\test_results
-
-:: 创建结果目录
-if not exist "%RESULTS_DIR%" mkdir "%RESULTS_DIR%"
-set "timestamp=%date:~0,4%%date:~5,2%%date:~8,2%_%time:~0,2%%time:~3,2%%time:~6,2%"
-set "result_file=%RESULTS_DIR%\test_results_%timestamp%.txt"
-
-:: 激活 Conda 环境
-call conda activate ollama_test
+set "OLLAMA_ROOT=D:\workspaces\localQwen_ollama\ollama-server"
+cd /d "%OLLAMA_ROOT%"
 
 :: 检查环境
-python check_env.bat
+call "%OLLAMA_ROOT%\scripts\utils\check_env.bat"
 if %errorlevel% neq 0 (
     echo Environment check failed. Please run setup_env.bat first.
-    pause
-    exit /b
+    exit /b 1
 )
 
+:: 创建结果目录
+set "RESULTS_DIR=%OLLAMA_ROOT%\logs\test_results"
+if not exist "%RESULTS_DIR%" mkdir "%RESULTS_DIR%"
 
-echo Ollama API Test Report - %date% %time% > %result_file%
-echo ================================================== >> %result_file%
+:: 设置时间戳
+set "timestamp=%date:~0,4%%date:~5,2%%date:~8,2%_%time:~0,2%%time:~3,2%%time:~6,2%"
+set "timestamp=%timestamp: =0%"
+set "result_file=%RESULTS_DIR%\test_results_%timestamp%.txt"
 
-:: 1. 基础网络连接测试
-echo Testing API Connection...
-echo [1. API Connection Test] >> %result_file%
-curl -s -X POST ^
+echo =================================
+echo Testing Ollama API Basic Function
+echo =================================
+
+:: 1. 基础功能测试
+echo.
+echo 1. Testing basic chat functionality...
+echo.
+curl -X POST ^
   -H "Content-Type: application/json" ^
-  -d "{\"model\":\"qwen:7b-chat\",\"prompt\":\"你在吗？\"}" ^
-  http://localhost:11434/api/generate >> %result_file% 2>&1
+  -d "{\"model\":\"qwen:7b-chat\",\"prompt\":\"请用一句话解释金刚经的核心思想。\"}" ^
+  http://localhost:11434/api/generate > "%result_file%"
 
 :: 2. 不同温度参数测试
 echo.
-echo Testing Different Temperature Settings... 
-echo. >> %result_file%
-echo [2. Temperature Parameter Tests] >> %result_file%
+echo 2. Testing with different parameters...
+echo.
+curl -X POST ^
+  -H "Content-Type: application/json" ^
+  -d "{\"model\":\"qwen:7b-chat\",\"prompt\":\"以诗歌形式阐述金刚经的智慧\",\"temperature\":0.9}" ^
+  http://localhost:11434/api/generate >> "%result_file%"
 
-:: 低温度测试 (更确定性的回答)
-echo Testing Low Temperature (0.1)... >> %result_file%
+:: 3. 长文本测试
+echo.
+echo 3. Testing long text processing...
+echo.
+curl -X POST ^
+  -H "Content-Type: application/json" ^
+  -d "{\"model\":\"qwen:7b-chat\",\"prompt\":\"请详细解释金刚经中'无我相、无人相、无众生相、无寿者相'的含义。\",\"num_ctx\":2048}" ^
+  http://localhost:11434/api/generate >> "%result_file%"
+
+:: 4. 性能测试
+echo.
+echo 4. Performance testing...
 set "start_time=%time%"
-curl -s -X POST ^
-  -H "Content-Type: application/json" ^
-  -d "{\"model\":\"qwen:7b-chat\",\"prompt\":\"请用100字解释金刚经中'无我相、无人相、无众生相、无寿者相'的含义\",\"temperature\":0.1}" ^
-  http://localhost:11434/api/generate >> %result_file%
-echo Response Time (Low Temp): %start_time% - %time% >> %result_file%
-
-:: 高温度测试 (更有创造性的回答)
-echo. >> %result_file%
-echo Testing High Temperature (0.9)... >> %result_file%
-set "start_time=%time%"
-curl -s -X POST ^
-  -H "Content-Type: application/json" ^
-  -d "{\"model\":\"qwen:7b-chat\",\"prompt\":\"请用诗歌的形式阐释金刚经的核心思想\",\"temperature\":0.9}" ^
-  http://localhost:11434/api/generate >> %result_file%
-echo Response Time (High Temp): %start_time% - %time% >> %result_file%
-
-:: 3. 响应时间测试
-echo. >> %result_file%
-echo [3. Response Time Test] >> %result_file%
-for /l %%i in (1,1,5) do (
-    echo Test %%i of 5... >> %result_file%
-    set "start_time=!time!"
-    curl -s -X POST ^
-      -H "Content-Type: application/json" ^
-      -d "{\"model\":\"qwen:7b-chat\",\"prompt\":\"金刚经的作者是谁？\"}" ^
-      http://localhost:11434/api/generate >> %result_file%
-    echo Response Time: !start_time! - !time! >> %result_file%
-    echo. >> %result_file%
-)
-
-:: 4. 上下文长度测试
-echo. >> %result_file%
-echo [4. Context Length Test] >> %result_file%
-curl -s -X POST ^
-  -H "Content-Type: application/json" ^
-  -d "{\"model\":\"qwen:7b-chat\",\"prompt\":\"请详细解释金刚经全文的结构和主要章节内容\",\"num_ctx\":2048}" ^
-  http://localhost:11434/api/generate >> %result_file%
-
-:: 5. 错误处理测试
-echo. >> %result_file%
-echo [5. Error Handling Test] >> %result_file%
-:: 测试无效模型
-curl -s -X POST ^
-  -H "Content-Type: application/json" ^
-  -d "{\"model\":\"invalid_model\",\"prompt\":\"test\"}" ^
-  http://localhost:11434/api/generate >> %result_file% 2>&1
-
-:: 测试超长输入
-set "long_prompt="
-for /l %%i in (1,1,1000) do set "long_prompt=!long_prompt!金"
-curl -s -X POST ^
-  -H "Content-Type: application/json" ^
-  -d "{\"model\":\"qwen:7b-chat\",\"prompt\":\"!long_prompt!\"}" ^
-  http://localhost:11434/api/generate >> %result_file% 2>&1
-
-:: 6. 性能基准测试
-echo. >> %result_file%
-echo [6. Performance Benchmark] >> %result_file%
-echo Testing response times for different prompt lengths... >> %result_file%
-
-:: 短文本测试
-set "start_time=%time%"
-curl -s -X POST ^
+curl -X POST ^
   -H "Content-Type: application/json" ^
   -d "{\"model\":\"qwen:7b-chat\",\"prompt\":\"金刚经讲了什么？\"}" ^
-  http://localhost:11434/api/generate >> %result_file%
-echo Short prompt response time: %start_time% - %time% >> %result_file%
+  http://localhost:11434/api/generate >> "%result_file%"
+set "end_time=%time%"
+echo Start Time: %start_time% >> "%result_file%"
+echo End Time: %end_time% >> "%result_file%"
 
-:: 中等文本测试
-set "start_time=%time%"
-curl -s -X POST ^
-  -H "Content-Type: application/json" ^
-  -d "{\"model\":\"qwen:7b-chat\",\"prompt\":\"请解释金刚经中'应无所住而生其心'的含义，并举例说明其在现代生活中的应用。\"}" ^
-  http://localhost:11434/api/generate >> %result_file%
-echo Medium prompt response time: %start_time% - %time% >> %result_file%
-
-:: 长文本测试
-set "start_time=%time%"
-curl -s -X POST ^
-  -H "Content-Type: application/json" ^
-  -d "{\"model\":\"qwen:7b-chat\",\"prompt\":\"请详细分析金刚经中'一切有为法，如梦幻泡影，如露亦如电，应作如是观'这句偈语的深层含义，并结合现代科学和哲学思想进行阐释。\"}" ^
-  http://localhost:11434/api/generate >> %result_file%
-echo Long prompt response time: %start_time% - %time% >> %result_file%
-
-:: 生成测试报告摘要
-echo. >> %result_file%
-echo ==================== >> %result_file%
-echo Test Summary >> %result_file%
-echo ==================== >> %result_file%
-echo Test completed at: %date% %time% >> %result_file%
-echo Results saved in: %result_file%
+:: 运行分析
+echo.
+echo Running analysis...
+python "%OLLAMA_ROOT%\src\analysis\response_analyzer.py" "%result_file%"
 
 echo.
 echo Test completed. Results saved to: %result_file%
 echo.
+type "%result_file%"
 
-:: 创建分析脚本（Python）
-echo import json > analyze_results.py
-echo import pandas as pd >> analyze_results.py
-echo import matplotlib.pyplot as plt >> analyze_results.py
-echo. >> analyze_results.py
-echo # Add analysis code here >> analyze_results.py
+pause@echo off
+chcp 65001
+setlocal enabledelayedexpansion
 
-:: 如果安装了Python，则运行分析
-where python >nul 2>nul
-if %errorlevel%==0 (
-    python analyze_results.py
+:: 设置根目录
+set "OLLAMA_ROOT=D:\workspaces\localQwen_ollama\ollama-server"
+cd /d "%OLLAMA_ROOT%"
+
+:: 检查环境
+call "%OLLAMA_ROOT%\scripts\utils\check_env.bat"
+if %errorlevel% neq 0 (
+    echo Environment check failed. Please run setup_env.bat first.
+    exit /b 1
 )
+
+:: 创建结果目录
+set "RESULTS_DIR=%OLLAMA_ROOT%\logs\test_results"
+if not exist "%RESULTS_DIR%" mkdir "%RESULTS_DIR%"
+
+:: 设置时间戳
+set "timestamp=%date:~0,4%%date:~5,2%%date:~8,2%_%time:~0,2%%time:~3,2%%time:~6,2%"
+set "timestamp=%timestamp: =0%"
+set "result_file=%RESULTS_DIR%\test_results_%timestamp%.txt"
+
+echo =================================
+echo Testing Ollama API Basic Function
+echo =================================
+
+:: 1. 基础功能测试
+echo.
+echo 1. Testing basic chat functionality...
+echo.
+curl -X POST ^
+  -H "Content-Type: application/json" ^
+  -d "{\"model\":\"qwen:7b-chat\",\"prompt\":\"请用一句话解释金刚经的核心思想。\"}" ^
+  http://localhost:11434/api/generate > "%result_file%"
+
+:: 2. 不同温度参数测试
+echo.
+echo 2. Testing with different parameters...
+echo.
+curl -X POST ^
+  -H "Content-Type: application/json" ^
+  -d "{\"model\":\"qwen:7b-chat\",\"prompt\":\"以诗歌形式阐述金刚经的智慧\",\"temperature\":0.9}" ^
+  http://localhost:11434/api/generate >> "%result_file%"
+
+:: 3. 长文本测试
+echo.
+echo 3. Testing long text processing...
+echo.
+curl -X POST ^
+  -H "Content-Type: application/json" ^
+  -d "{\"model\":\"qwen:7b-chat\",\"prompt\":\"请详细解释金刚经中'无我相、无人相、无众生相、无寿者相'的含义。\",\"num_ctx\":2048}" ^
+  http://localhost:11434/api/generate >> "%result_file%"
+
+:: 4. 性能测试
+echo.
+echo 4. Performance testing...
+set "start_time=%time%"
+curl -X POST ^
+  -H "Content-Type: application/json" ^
+  -d "{\"model\":\"qwen:7b-chat\",\"prompt\":\"金刚经讲了什么？\"}" ^
+  http://localhost:11434/api/generate >> "%result_file%"
+set "end_time=%time%"
+echo Start Time: %start_time% >> "%result_file%"
+echo End Time: %end_time% >> "%result_file%"
+
+:: 运行分析
+echo.
+echo Running analysis...
+python "%OLLAMA_ROOT%\src\analysis\response_analyzer.py" "%result_file%"
+
+echo.
+echo Test completed. Results saved to: %result_file%
+echo.
+type "%result_file%"
 
 pause
