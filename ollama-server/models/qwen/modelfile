@@ -1,5 +1,4 @@
-# 使用之前的modelfile内容
-FROM qwen:7b-chat
+FROM llama3-chinese
 
 # 系统参数配置
 PARAMETER temperature 0.7
@@ -9,7 +8,7 @@ PARAMETER repeat_penalty 1.1
 PARAMETER num_ctx 2048
 
 # 系统提示语配置
-SYSTEM You are a helpful AI assistant based on Qwen language model.
+SYSTEM You are a helpful AI assistant based on LLaMA model.
 
 # 设置模型名称
-SET name qwen-chat
+SET name llama3-chinese

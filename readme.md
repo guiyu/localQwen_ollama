@@ -1,223 +1,181 @@
-# Ollama Server - Windows本地部署方案
+# Ollama Windows本地部署方案
 
-## 目录
-- [系统要求](#系统要求)
-- [快速开始](#快速开始)
-- [目录结构](#目录结构)
-- [详细安装步骤](#详细安装步骤)
-- [功能模块](#功能模块)
-- [运维指南](#运维指南)
-- [故障排除](#故障排除)
+## 项目介绍
+本项目实现了基于Windows的Ollama本地部署方案，通过VPS实现公网访问。主要特点：
+- Windows本地运行Ollama服务
+- VPS提供反向代理和公网访问能力
+- SSH隧道实现内网穿透
+- HAProxy负载均衡支持
 
 ## 系统要求
 
+### Windows服务器
 - Windows 10/11
-- NVIDIA GPU (RTX 4070 或更高)
-- Python 3.9+
-- CUDA 11.7+
-- 内存: 最小16GB，推荐32GB
-- 存储: 最小100GB可用空间
+- 16GB+ RAM
+- NVIDIA GPU (推荐RTX 4070或更高)
+- Git Bash
 - PowerShell 5.0+
 
-## 快速开始
-
-1. **初始化环境**
-```batch
-mkdir D:\ollama-server
-cd D:\ollama-server
-```
-
-2. **安装服务**
-```batch
-scripts\install\install_all.bat
-```
-
-3. **测试服务**
-```batch
-scripts\test\test-sutra.bat
-```
-
-4. **查看分析报告**
-```batch
-python src\analysis\response_analyzer.py
-```
+### VPS服务器
+- Ubuntu 22.04 LTS
+- 2GB+ RAM
+- 公网IP
 
 ## 目录结构
-
-```
-D:\ollama-server\
-├── bin\                    # 可执行文件
+D:\workspaces\localQwen_ollama
+├── ollama-server
+├── bin
 │   ├── ollama.exe
-│   └── ollama_service.exe
-├── models\                 # 模型文件
-│   └── qwen\
-│       ├── modelfile
-│       └── cache\
-├── configs\                # 配置文件
+│   └── start_ollama.bat
+├── models
+│   └── qwen
+│       └── modelfile
+├── configs
 │   ├── server.json
-│   └── service.json
-├── scripts\                # 脚本文件
-│   ├── install\
-│   ├── test\
-│   └── utils\
-├── logs\                   # 日志文件
-│   ├── server\
-│   └── models\
-└── tools\                  # 工具程序
-    ├── monitoring\
-    └── maintenance\
-```
+│   └── haproxy.cfg
+├── logs
+│   ├── ollama.log
+│   ├── service_out.log
+│   └── service_err.log
+├── scripts
+│   ├── windows
+│   │   ├── setup_service.ps1
+│   │   ├── cleanup.ps1
+│   │   └── start_tunnel.sh
+│   └── vps
+│       └── setup_vps.sh
+└── tools
+└── nssm.exe
+## 部署步骤
 
-## 详细安装步骤
+### Windows端部署
 
-### 1. 环境检查
-```batch
-scripts\utils\check_env.bat
-```
+1. 环境准备
+```powershell
+# 以管理员权限运行PowerShell
+cd D:\workspaces\localQwen_ollama\ollama-server\scripts\windows
+2. 清理环境（如果需要）
+.\cleanup.ps1
+3. 安装和配置服务
+.\setup_service.ps1
+4. 启动SSH隧道（在Git Bash中运行）
+./start_tunnel.sh
 
-### 2. 服务安装
-```batch
-scripts\install\setup_service.bat
-```
+### VPS端部署
 
-### 3. 模型安装
-```batch
-scripts\install\setup_model.bat
-```
+1. 安装必要组件
+apt-get update && apt-get install -y haproxy
 
-### 4. 验证安装
-```batch
-scripts\test\test-api.bat
-```
+2. 部署配置
+cd ~/localQwen_ollama/ollama-server/scripts/vps
+chmod +x setup_vps.sh
+./setup_vps.sh
 
-## 功能模块
+### 验证部署
+#### Windows端验证
+Get-Service OllamaService
 
-### API 服务
-- 基础对话能力
-- 参数动态调整
-- 上下文管理
-- 并发请求处理
+curl http://localhost:11434/api/generate `
+    -Method POST `
+    -Headers @{"Content-Type"="application/json"} `
+    -Body '{"model":"llama3-chinese","prompt":"你好"}'
 
-### 性能分析
-- 响应时间统计
-- GPU使用率监控
-- 内存占用分析
-- 吞吐量测试
+#### VPS端验证
+systemctl status haproxy
 
-### 运维工具
-- 日志管理
-- 缓存清理
-- 性能监控
-- 服务管理
+curl http://localhost:8080/api/generate \
+    -H "Content-Type: application/json" \
+    -d '{"model":"llama3-chinese","prompt":"你好"}'
 
-## 运维指南
+##API访问说明
+###基础API
 
-### 日常维护
-```batch
-# 查看服务状态
-scripts\service\status.bat
+端点：http://YOUR_VPS_IP:8080/api/
+生成接口：/api/generate
+聊天接口：/api/chat
 
-# 清理缓存
-scripts\utils\clean_cache.bat
+###HAProxy监控
 
-# 监控GPU
-tools\monitoring\gpu_monitor.bat
-```
+统计页面：http://YOUR_VPS_IP:8404/stats
+默认凭据：
 
-### 日志查看
-```batch
-# 服务日志
-type logs\server\ollama.log
+用户名：admin
+密码：admin123
 
-# 错误日志
-type logs\server\error.log
-```
 
-### 性能监控
-```batch
-# GPU监控
-python src\monitoring\gpu_monitor.py
 
-# 性能分析
-python src\analysis\response_analyzer.py
-```
+##维护指南
+###Windows端维护
+powershellCopy# 重启服务
+Restart-Service OllamaService
 
-## 故障排除
+查看日志
+Get-Content "D:\workspaces\localQwen_ollama\ollama-server\logs\ollama.log" -Tail 100
 
-### 常见问题解决
+重建SSH隧道
+./start_tunnel.sh
+VPS端维护
+bashCopy# 重启HAProxy
+systemctl restart haproxy
 
-1. **服务无法启动**
-   - 检查日志: `logs\server\error.log`
-   - 检查GPU: `nvidia-smi`
-   - 检查端口: `netstat -ano | findstr "11434"`
+查看日志
+tail -f /var/log/haproxy.log
 
-2. **模型加载失败**
-   - 检查显存
-   - 验证模型文件
-   - 查看模型日志
+运行状态检查
+/usr/local/bin/check_ollama.sh
+故障排除
 
-3. **性能问题**
-   - 检查GPU使用率
-   - 监控内存占用
-   - 分析响应时间
+###服务启动失败
 
-### 调试命令
+检查日志：Get-Content D:\workspaces\localQwen_ollama\ollama-server\logs\ollama.log
+运行清理脚本：cleanup.ps1
+重新安装服务：setup_service.ps1
 
-```batch
-# 检查环境
-scripts\utils\check_env.bat
 
-# 测试API
-scripts\test\test-api.bat
+###API访问失败
 
-# 性能测试
-scripts\test\test-perf.bat
-```
+检查SSH隧道状态
+验证本地服务是否正常运行
+检查HAProxy配置和状态
 
-## 配置参考
 
-### 服务配置
-```json
-{
-    "server": {
-        "host": "0.0.0.0",
-        "port": 11434,
-        "max_connections": 1000,
-        "timeout": 30
-    },
-    "gpu": {
-        "device": 0,
-        "memory_limit": "10GB"
-    }
-}
-```
+##性能问题
 
-### 模型配置
-```yaml
-FROM qwen:7b-chat
+检查GPU使用情况
+监控内存占用
+查看HAProxy统计信息
 
-PARAMETER temperature 0.7
-PARAMETER top_p 0.9
-PARAMETER top_k 40
-PARAMETER repeat_penalty 1.1
-PARAMETER num_ctx 2048
 
-SYSTEM You are a helpful AI assistant.
-```
 
-## 注意事项
+##安全建议
 
-1. **资源管理**
-   - 定期清理缓存
-   - 监控显存使用
-   - 管理日志大小
+###基础安全
 
-2. **安全建议**
-   - 定期更新系统
-   - 保护配置文件
-   - 监控访问日志
+修改HAProxy统计页面的默认密码
+配置防火墙只允许必要的端口访问
+使用强密码和密钥认证
 
-3. **性能优化**
-   - 适配GPU配置
-   - 优化并发设置
-   - 调整缓存策略
+
+##访问控制
+
+限制API访问IP
+配置请求速率限制
+监控异常访问
+
+
+##日志管理
+
+定期轮转日志
+监控错误日志
+保存关键操作日志
+
+
+
+#更新日志
+2024-12-16
+
+完善HAProxy配置
+移除不必要的健康检查
+优化SSH隧道配置
+添加服务监控脚本
+完善部署文档
