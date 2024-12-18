@@ -6,6 +6,8 @@ import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.speech.RecognitionListener
+import android.speech.SpeechRecognizer
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageButton
@@ -153,40 +155,81 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startVoiceInteraction() {
-        speechManager.startListening(object : SpeechManager.SpeechCallback {
-            override fun onListeningStart() {
+        // 创建 RecognitionListener 对象
+        val recognitionListener = object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) {
+                runOnUiThread {
+                    recognitionStatus.text = "请开始说话..."
+                }
+            }
+
+            override fun onBeginningOfSpeech() {
                 runOnUiThread {
                     recognitionStatus.text = "正在聆听..."
                 }
             }
 
             override fun onRmsChanged(rmsdB: Float) {
-                // 可以用这个值来更新UI显示音量变化
                 runOnUiThread {
                     val volume = (rmsdB * 2).coerceIn(0f, 10f)
                     recognitionStatus.text = "正在聆听: ${"▮".repeat(volume.toInt())}"
                 }
             }
 
-            override fun onResult(text: String) {
+            override fun onBufferReceived(buffer: ByteArray?) {
+                // 可以不处理
+            }
+
+            override fun onEndOfSpeech() {
                 runOnUiThread {
-                    handleUserInput(text)
+                    recognitionStatus.text = "处理中..."
                 }
             }
 
-            override fun onError(errorMessage: String) {
+            override fun onError(error: Int) {
+                val errorMessage = when (error) {
+                    SpeechRecognizer.ERROR_AUDIO -> "音频录制错误"
+                    SpeechRecognizer.ERROR_CLIENT -> "客户端错误"
+                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "权限不足"
+                    SpeechRecognizer.ERROR_NETWORK -> "网络错误"
+                    SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "网络超时"
+                    SpeechRecognizer.ERROR_NO_MATCH -> "未能匹配语音"
+                    SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "识别服务忙"
+                    SpeechRecognizer.ERROR_SERVER -> "服务器错误"
+                    SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "语音超时"
+                    else -> "未知错误"
+                }
                 runOnUiThread {
                     Toast.makeText(this@MainActivity, errorMessage, Toast.LENGTH_SHORT).show()
                     recognitionStatus.text = errorMessage
                 }
             }
 
-            override fun onReadyForSpeech() {
-                runOnUiThread {
-                    recognitionStatus.text = "请开始说话..."
+            override fun onResults(results: Bundle?) {
+                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                matches?.firstOrNull()?.let { text ->
+                    runOnUiThread {
+                        handleUserInput(text)
+                    }
                 }
             }
-        })
+
+            override fun onPartialResults(partialResults: Bundle?) {
+                val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                matches?.firstOrNull()?.let { text ->
+                    runOnUiThread {
+                        recognitionStatus.text = "识别中: $text"
+                    }
+                }
+            }
+
+            override fun onEvent(eventType: Int, params: Bundle?) {
+                // 可以不处理
+            }
+        }
+
+        // 调用 startListening 并传入 recognitionListener
+        speechManager.startListening(recognitionListener)
     }
 
     override fun onDestroy() {
