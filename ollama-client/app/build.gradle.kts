@@ -31,16 +31,17 @@ android {
 }
 
 dependencies {
-    // 降级 AndroidX 核心库到支持 API 16 的版本
+    // 现有依赖保持不变
     implementation("androidx.core:core-ktx:1.3.2")
     implementation("androidx.appcompat:appcompat:1.2.0")
     implementation("com.google.android.material:material:1.4.0")
 
     // 网络请求
-    implementation("com.squareup.okhttp3:okhttp:3.12.13")
+    implementation("com.squareup.okhttp3:okhttp:3.12.13")  // 保持这个版本以支持 API 16
+    implementation("com.squareup.okhttp3:okhttp-sse:3.12.13")  // 添加 SSE 支持
     implementation("com.google.code.gson:gson:2.8.9")
 
-    // 生命周期组件 - 使用支持 API 16 的版本
+    // 生命周期组件
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.2.0")
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.2.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.2.0")

@@ -1,3 +1,6 @@
+// app/src/main/java/com/qw/sutra/speech/SpeechManager.kt
+package com.qw.sutra.speech
+
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -5,13 +8,22 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
-import android.widget.Toast
+import android.speech.tts.UtteranceProgressListener
 import java.util.Locale
+import java.util.UUID
 
-// app/src/main/java/com/qw/sutra/speech/SpeechManager.kt
 class SpeechManager(private val context: Context) {
     private var speechRecognizer: SpeechRecognizer? = null
     private var textToSpeech: TextToSpeech? = null
+    private var isListening = false
+
+    interface SpeechCallback {
+        fun onListeningStart()
+        fun onRmsChanged(rmsdB: Float)
+        fun onResult(text: String)
+        fun onError(errorMessage: String)
+        fun onReadyForSpeech()
+    }
 
     init {
         initializeTextToSpeech()
@@ -21,63 +33,53 @@ class SpeechManager(private val context: Context) {
         textToSpeech = TextToSpeech(context) { status ->
             if (status != TextToSpeech.ERROR) {
                 textToSpeech?.language = Locale.CHINESE
+                textToSpeech?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) {}
+                    override fun onDone(utteranceId: String?) {}
+                    override fun onError(utteranceId: String?) {}
+                })
             }
         }
     }
 
-    fun startListening(onResult: (String) -> Unit) {
+    fun startListening(callback: SpeechCallback) {
+        if (isListening) return
+
+        isListening = true
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
             setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {
-                    // 准备好开始说话
+                    callback.onReadyForSpeech()
                 }
 
                 override fun onBeginningOfSpeech() {
-                    // 开始说话
+                    callback.onListeningStart()
                 }
 
                 override fun onRmsChanged(rmsdB: Float) {
-                    // 音量变化
+                    callback.onRmsChanged(rmsdB)
                 }
 
-                override fun onBufferReceived(buffer: ByteArray?) {
-                    // 接收到语音数据
-                }
+                override fun onBufferReceived(buffer: ByteArray?) {}
 
                 override fun onEndOfSpeech() {
-                    // 说话结束
+                    isListening = false
                 }
 
                 override fun onError(error: Int) {
-                    // 处理错误
-                    val errorMessage = when (error) {
-                        SpeechRecognizer.ERROR_AUDIO -> "音频录制错误"
-                        SpeechRecognizer.ERROR_CLIENT -> "客户端错误"
-                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "权限不足"
-                        SpeechRecognizer.ERROR_NETWORK -> "网络错误"
-                        SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "网络超时"
-                        SpeechRecognizer.ERROR_NO_MATCH -> "未能匹配语音"
-                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "识别服务忙"
-                        SpeechRecognizer.ERROR_SERVER -> "服务器错误"
-                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "语音超时"
-                        else -> "未知错误"
-                    }
-                    // 可以在这里处理错误，比如通知用户
-                    Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
+                    isListening = false
+                    val errorMessage = getErrorMessage(error)
+                    callback.onError(errorMessage)
                 }
 
                 override fun onResults(results: Bundle?) {
+                    isListening = false
                     val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                    matches?.firstOrNull()?.let(onResult)
+                    matches?.firstOrNull()?.let { callback.onResult(it) }
                 }
 
-                override fun onPartialResults(partialResults: Bundle?) {
-                    // 部分识别结果
-                }
-
-                override fun onEvent(eventType: Int, params: Bundle?) {
-                    // 其他事件
-                }
+                override fun onPartialResults(partialResults: Bundle?) {}
+                override fun onEvent(eventType: Int, params: Bundle?) {}
             })
 
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
@@ -92,12 +94,39 @@ class SpeechManager(private val context: Context) {
         }
     }
 
-    fun speak(text: String) {
-        @Suppress("DEPRECATION")
-        textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, null)
+    fun speak(text: String, onComplete: (() -> Unit)? = null) {
+        val utteranceId = UUID.randomUUID().toString()
+        textToSpeech?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {}
+            override fun onDone(utteranceId: String?) {
+                onComplete?.invoke()
+            }
+            override fun onError(utteranceId: String?) {
+                onComplete?.invoke()
+            }
+        })
+
+        val params = HashMap<String, String>().apply {
+            put(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
+        }
+        textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, params)
+    }
+
+    private fun getErrorMessage(error: Int): String = when (error) {
+        SpeechRecognizer.ERROR_AUDIO -> "音频录制错误"
+        SpeechRecognizer.ERROR_CLIENT -> "客户端错误"
+        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "权限不足"
+        SpeechRecognizer.ERROR_NETWORK -> "网络错误"
+        SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "网络超时"
+        SpeechRecognizer.ERROR_NO_MATCH -> "未能匹配语音"
+        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "识别服务忙"
+        SpeechRecognizer.ERROR_SERVER -> "服务器错误"
+        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "语音超时"
+        else -> "未知错误"
     }
 
     fun release() {
+        isListening = false
         speechRecognizer?.destroy()
         textToSpeech?.stop()
         textToSpeech?.shutdown()

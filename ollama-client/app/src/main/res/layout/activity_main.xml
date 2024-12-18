@@ -3,6 +3,41 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+    <!-- 语音识别状态显示 -->
+    <TextView
+        android:id="@+id/recognitionStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:layout_marginHorizontal="16dp"
+        android:gravity="center"
+        android:textSize="16sp"/>
+
+    <!-- 测试用的文本输入区域 -->
+    <LinearLayout
+        android:id="@+id/testInputArea"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_above="@id/voiceButton"
+        android:layout_marginBottom="16dp"
+        android:orientation="horizontal"
+        android:padding="16dp">
+
+        <EditText
+            android:id="@+id/testInput"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="测试用文本输入"/>
+
+        <Button
+            android:id="@+id/testSendButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="发送"/>
+    </LinearLayout>
+
+    <!-- 原有的语音按钮 -->
     <ImageButton
         android:id="@+id/voiceButton"
         android:layout_width="64dp"

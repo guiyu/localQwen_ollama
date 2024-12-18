@@ -1,35 +1,116 @@
 // app/src/main/java/com/qw/sutra/MainActivity.kt
 package com.qw.sutra
 
-import ApiManager
-import SpeechManager
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.widget.Button
+import android.widget.EditText
 import android.widget.ImageButton
+import android.widget.TextView
 import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.qw.sutra.model.ModelConfig
+import com.qw.sutra.network.ApiManager
+import com.qw.sutra.network.NetworkMonitor
+import com.qw.sutra.speech.SpeechManager
+import com.qw.sutra.storage.ChatHistoryManager
 
 class MainActivity : AppCompatActivity() {
     private lateinit var speechManager: SpeechManager
     private lateinit var apiManager: ApiManager
+    private lateinit var chatHistoryManager: ChatHistoryManager
+    private lateinit var recognitionStatus: TextView
+    private lateinit var networkMonitor: NetworkMonitor
 
     companion object {
         private const val PERMISSION_REQUEST_CODE = 1
     }
 
+    @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        initializeManagers()
+        setupViews()
+        setupTestInterface()
+        initializeNetworkMonitor()
+
+    }
+
+    @SuppressLint("NewApi")
+    @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
+    private fun initializeNetworkMonitor() {
+        networkMonitor = NetworkMonitor(this)
+        networkMonitor.startMonitoring { isAvailable ->
+            runOnUiThread {
+                if (!isAvailable) {
+                    Toast.makeText(this, "网络连接已断开", Toast.LENGTH_SHORT).show()
+                    recognitionStatus.text = "网络连接已断开"
+                }
+            }
+        }
+    }
+
+    private fun initializeManagers() {
         speechManager = SpeechManager(this)
         apiManager = ApiManager()
+        chatHistoryManager = ChatHistoryManager(this)
+    }
 
+    private fun setupViews() {
+        recognitionStatus = findViewById(R.id.recognitionStatus)
         findViewById<ImageButton>(R.id.voiceButton).setOnClickListener {
             checkPermissionAndStart()
         }
+    }
+
+    private fun setupTestInterface() {
+        val testInput = findViewById<EditText>(R.id.testInput)
+        findViewById<Button>(R.id.testSendButton).setOnClickListener {
+            val text = testInput.text.toString()
+            if (text.isNotEmpty()) {
+                handleUserInput(text)
+                testInput.setText("")
+            }
+        }
+    }
+
+    private fun handleUserInput(text: String) {
+        // 保存用户输入到历史
+        chatHistoryManager.saveMessage("user", text)
+
+        // 显示处理状态
+        recognitionStatus.text = "正在处理: $text"
+
+        apiManager.startChatStream(
+            prompt = text,
+            modelConfig = ModelConfig(),
+            onResponse = { response ->
+                runOnUiThread {
+                    speechManager.speak(response)
+                    chatHistoryManager.saveMessage("assistant", response)
+                    recognitionStatus.text = response
+                }
+            },
+            onComplete = {
+                runOnUiThread {
+                    recognitionStatus.text = "处理完成"
+                }
+            },
+            onError = { error ->
+                runOnUiThread {
+                    Toast.makeText(this, error, Toast.LENGTH_SHORT).show()
+                    recognitionStatus.text = "错误: $error"
+                }
+            }
+        )
     }
 
     private fun checkPermissionAndStart() {
@@ -63,20 +144,45 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startVoiceInteraction() {
-        speechManager.startListening { text ->
-            // 显示识别中的提示
-            Toast.makeText(this, "正在处理: $text", Toast.LENGTH_SHORT).show()
-
-            apiManager.sendPrompt(text) { response ->
+        speechManager.startListening(object : SpeechManager.SpeechCallback {
+            override fun onListeningStart() {
                 runOnUiThread {
-                    speechManager.speak(response)
+                    recognitionStatus.text = "正在聆听..."
                 }
             }
-        }
+
+            override fun onRmsChanged(rmsdB: Float) {
+                // 可以用这个值来更新UI显示音量变化
+                runOnUiThread {
+                    val volume = (rmsdB * 2).coerceIn(0f, 10f)
+                    recognitionStatus.text = "正在聆听: ${"▮".repeat(volume.toInt())}"
+                }
+            }
+
+            override fun onResult(text: String) {
+                runOnUiThread {
+                    handleUserInput(text)
+                }
+            }
+
+            override fun onError(errorMessage: String) {
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, errorMessage, Toast.LENGTH_SHORT).show()
+                    recognitionStatus.text = errorMessage
+                }
+            }
+
+            override fun onReadyForSpeech() {
+                runOnUiThread {
+                    recognitionStatus.text = "请开始说话..."
+                }
+            }
+        })
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        networkMonitor.stopMonitoring()
         speechManager.release()
     }
 }
