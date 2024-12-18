@@ -94,22 +94,16 @@ class SpeechManager(private val context: Context) {
         }
     }
 
-    fun speak(text: String, onComplete: (() -> Unit)? = null) {
-        val utteranceId = UUID.randomUUID().toString()
-        textToSpeech?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(utteranceId: String?) {}
-            override fun onDone(utteranceId: String?) {
-                onComplete?.invoke()
-            }
-            override fun onError(utteranceId: String?) {
-                onComplete?.invoke()
-            }
-        })
+    fun speak(text: String) {
+        // 检查是否有正在进行的TTS
+        textToSpeech?.stop()
 
+        // 使用TTS播放文本
+        val utteranceId = UUID.randomUUID().toString()
         val params = HashMap<String, String>().apply {
             put(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
         }
-        textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, params)
+        textToSpeech?.speak(text, TextToSpeech.QUEUE_ADD, params)
     }
 
     private fun getErrorMessage(error: Int): String = when (error) {

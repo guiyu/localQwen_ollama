@@ -5,7 +5,7 @@ data class ModelConfig(
     val modelName: String = "llama3-chinese",
     val temperature: Float = 0.7f,
     val topP: Float = 0.9f,
-    val maxTokens: Int = 2048
+    val stream: Boolean = false  // 添加stream参数
 ) {
     companion object {
         val SUPPORTED_MODELS = listOf(

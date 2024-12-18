@@ -1,20 +1,18 @@
 // app/src/main/java/com/qw/sutra/network/ApiManager.kt
 package com.qw.sutra.network
 
+import android.content.Context
 import android.util.Log
-import com.qw.sutra.App
+import com.google.gson.Gson
 import com.qw.sutra.model.ModelConfig
 import com.qw.sutra.utils.NetworkUtils
 import okhttp3.*
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
-import okhttp3.sse.EventSource
-import okhttp3.sse.EventSourceListener
-import okhttp3.sse.EventSources
-import java.io.File
 import java.io.IOException
 
-class ApiManager {
+// app/src/main/java/com/qw/sutra/network/ApiManager.kt
+class ApiManager(private val context: Context) {
     companion object {
         private const val TAG = "ApiManager"
     }
@@ -24,34 +22,7 @@ class ApiManager {
         .writeTimeout(20, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .retryOnConnectionFailure(true)
-        .apply {
-            val cacheDir = File(App.instance.cacheDir, "http_cache")
-            val cacheSize = 10 * 1024 * 1024L
-            cache(Cache(cacheDir, cacheSize))
-
-            // 添加日志拦截器
-            addInterceptor { chain ->
-                val request = chain.request()
-                Log.d(TAG, "Network Request - ${request.method()} ${request.url()}")
-                Log.d(TAG, "Headers: ${request.headers()}")
-                if (request.body() != null) {
-                    Log.d(TAG, "Request Body: ${request.body()}")
-                }
-
-                val response = chain.proceed(request)
-                Log.d(TAG, "Network Response - Code: ${response.code()} for ${response.request().url()}")
-                response
-            }
-        }
         .build()
-
-    private val factory: EventSource.Factory by lazy {
-        Log.d(TAG, "Creating EventSource factory")
-        EventSources.createFactory(client)
-    }
-
-    private var currentEventSource: EventSource? = null
-    private val responseBuilder = StringBuilder()
 
     fun startChatStream(
         prompt: String,
@@ -61,36 +32,30 @@ class ApiManager {
         onError: (String) -> Unit
     ) {
         try {
-            Log.i(TAG, "Starting chat stream with prompt: ${prompt.take(100)}...")
+            Log.i(TAG, "Starting chat with prompt: ${prompt.take(100)}...")
 
-            if (!NetworkUtils.isNetworkAvailable(App.instance)) {
+            if (!NetworkUtils.isNetworkAvailable(context)) {
                 Log.e(TAG, "Network not available")
                 onError("网络不可用")
                 return
             }
 
-            currentEventSource?.let {
-                Log.d(TAG, "Cancelling existing request")
-                it.cancel()
-            }
-
             val json = JSONObject().apply {
                 put("model", modelConfig.modelName)
                 put("prompt", prompt)
-                put("stream", true)
+                put("stream", modelConfig.stream)  // 设置stream参数
             }
+
+            Log.d(TAG, "Request payload: $json")
 
             val request = Request.Builder()
                 .url("http://192.3.59.148:8080/api/generate")
-                .post(
-                    RequestBody.create(
-                        MediaType.parse("application/json"),
-                        json.toString()
-                    )
-                )
+                .post(RequestBody.create(
+                    MediaType.parse("application/json"),
+                    json.toString()
+                ))
                 .build()
 
-            // 使用普通的 OkHttp 请求而不是 SSE
             client.newCall(request).enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
                     Log.e(TAG, "Request failed", e)
@@ -98,65 +63,40 @@ class ApiManager {
                 }
 
                 override fun onResponse(call: Call, response: Response) {
-                    Log.i(TAG, "Got response: ${response.code()}")
-
                     try {
-                        response.body()?.let { body ->
-                            // 获取输入流
-                            body.source().use { source ->
-                                while (!source.exhausted()) {
-                                    // 读取每一行数据
-                                    val line = source.readUtf8Line()
-                                    if (line == null || line.isEmpty()) continue
+                        val responseBody = response.body()?.string()
+                        Log.d(TAG, "Response body: $responseBody")
 
-                                    Log.v(TAG, "Received line: $line")
-
-                                    try {
-                                        val jsonResponse = JSONObject(line)
-                                        val responseText = jsonResponse.optString("response", "")
-                                        val done = jsonResponse.optBoolean("done", false)
-
-                                        if (responseText.isNotEmpty()) {
-                                            responseBuilder.append(responseText)
-                                            onResponse(responseText)
-                                        }
-
-                                        if (done) {
-                                            Log.i(TAG, "Stream completed")
-                                            onComplete()
-                                            break
-                                        }
-                                    } catch (e: Exception) {
-                                        Log.e(TAG, "Error parsing response", e)
-                                        onError("解析响应失败: ${e.message}")
-                                        break
-                                    }
-                                }
-                            }
+                        if (responseBody == null) {
+                            onError("响应为空")
+                            return
                         }
+
+                        // 解析响应
+                        val jsonResponse = JSONObject(responseBody)
+                        val responseText = jsonResponse.optString("response", "")
+
+                        if (responseText.isNotEmpty()) {
+                            Log.i(TAG, "Received response: $responseText")
+                            onResponse(responseText)
+                        }
+
+                        // 检查是否完成
+                        if (jsonResponse.optBoolean("done", false)) {
+                            Log.i(TAG, "Request completed")
+                            onComplete()
+                        }
+
                     } catch (e: Exception) {
-                        Log.e(TAG, "Error reading response", e)
-                        onError("读取响应失败: ${e.message}")
-                    } finally {
-                        response.close()
+                        Log.e(TAG, "Error parsing response", e)
+                        onError("解析响应失败: ${e.message}")
                     }
                 }
             })
 
-            Log.i(TAG, "Request sent successfully")
-
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to start stream", e)
-            onError("创建连接失败: ${e.message}")
-        }
-    }
-
-    fun cancelCurrentStream() {
-        currentEventSource?.let {
-            Log.i(TAG, "Manually cancelling current stream")
-            it.cancel()
-            currentEventSource = null
-            Log.d(TAG, "Stream cancelled and reference cleared")
+            Log.e(TAG, "Failed to start request", e)
+            onError("创建请求失败: ${e.message}")
         }
     }
 }

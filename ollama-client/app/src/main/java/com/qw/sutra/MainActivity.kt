@@ -60,7 +60,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun initializeManagers() {
         speechManager = SpeechManager(this)
-        apiManager = ApiManager()
+        apiManager = ApiManager(this)
         chatHistoryManager = ChatHistoryManager(this)
     }
 
@@ -89,14 +89,23 @@ class MainActivity : AppCompatActivity() {
         // 显示处理状态
         recognitionStatus.text = "正在处理: $text"
 
+        // 使用非流式请求
+        val modelConfig = ModelConfig(
+            modelName = "llama3-chinese",
+            stream = false  // 设置为非流式请求
+        )
+
         apiManager.startChatStream(
             prompt = text,
-            modelConfig = ModelConfig(),
+            modelConfig = modelConfig,
             onResponse = { response ->
                 runOnUiThread {
-                    speechManager.speak(response)
-                    chatHistoryManager.saveMessage("assistant", response)
+                    // 更新UI显示完整响应
                     recognitionStatus.text = response
+                    // 播放完整响应
+                    speechManager.speak(response)
+                    // 保存响应到历史
+                    chatHistoryManager.saveMessage("assistant", response)
                 }
             },
             onComplete = {
