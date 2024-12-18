@@ -161,3 +161,5 @@ cython_debug/
 /.history
 /results
 /ollama-server/logs
+/ollama-client/android-ollama/.idea
+/ollama-client/.idea
