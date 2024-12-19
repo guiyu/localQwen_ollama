@@ -1,9 +1,7 @@
-// app/src/main/java/com/qw/sutra/network/ApiManager.kt
 package com.qw.sutra.network
 
 import android.content.Context
 import android.util.Log
-import com.google.gson.Gson
 import com.qw.sutra.model.ModelConfig
 import com.qw.sutra.utils.NetworkUtils
 import okhttp3.*
@@ -11,7 +9,6 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 import java.io.IOException
 
-// app/src/main/java/com/qw/sutra/network/ApiManager.kt
 class ApiManager(private val context: Context) {
     companion object {
         private const val TAG = "ApiManager"
@@ -49,6 +46,7 @@ class ApiManager(private val context: Context) {
             Log.d(TAG, "Request payload: $json")
 
             val request = Request.Builder()
+                //TODO 更新为域名/https/做鉴权加固
                 .url("http://192.3.59.148:8080/api/generate")
                 .post(RequestBody.create(
                     MediaType.parse("application/json"),

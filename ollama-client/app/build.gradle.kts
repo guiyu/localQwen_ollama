@@ -13,6 +13,23 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+        // 添加 NDK 配置
+        ndkVersion = "25.2.9519653"
+
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64", "x86")
+        }
+
+    }
+    dependencies {
+        implementation(project(":models"))
+    }
+
+    // 添加 jniLibs 配置
+    sourceSets {
+        getByName("main") {
+            jniLibs.srcDirs("libs/jniLibs")
+        }
     }
 
     buildTypes {
@@ -31,6 +48,7 @@ android {
 }
 
 dependencies {
+
     // 现有依赖保持不变
     implementation("androidx.core:core-ktx:1.3.2")
     implementation("androidx.appcompat:appcompat:1.2.0")
@@ -55,4 +73,13 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.2.0")
+
+
+    // 添加 Vosk 依赖
+    implementation("com.alphacephei:vosk-android:0.3.47")
+    implementation("org.apache.commons:commons-io:1.3.2")
+
+    // Vosk 必要依赖
+    implementation("net.java.dev.jna:jna:5.13.0@aar")
+    implementation("com.alphacephei:vosk-android:0.3.47@aar")
 }

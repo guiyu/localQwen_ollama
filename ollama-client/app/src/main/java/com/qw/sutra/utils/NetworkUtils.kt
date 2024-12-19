@@ -9,6 +9,7 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.os.Build
 import android.telephony.TelephonyManager
+import android.util.Log
 import androidx.annotation.RequiresApi
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.callbackFlow
  * 网络工具类
  */
 object NetworkUtils {
+    private const val TAG = "NetworkUtils"
 
     /**
      * 检查网络是否可用
@@ -26,23 +28,36 @@ object NetworkUtils {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val network = connectivityManager.activeNetwork ?: return false
-            val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+            val network = connectivityManager.activeNetwork
+            Log.d(TAG, "Active network: $network")
+
+            val capabilities = connectivityManager.getNetworkCapabilities(network)
+            Log.d(TAG, "Network capabilities: $capabilities")
 
             return when {
-                // WiFi
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> true
-                // 蜂窝网络
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> true
-                // 以太网
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> true
-                // VPN
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN) -> true
-                else -> false
+                capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true -> {
+                    Log.i(TAG, "WiFi network available")
+                    true
+                }
+                capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> {
+                    Log.i(TAG, "Cellular network available")
+                    true
+                }
+                capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) == true -> {
+                    Log.i(TAG, "Ethernet network available")
+                    true
+                }
+                else -> {
+                    Log.w(TAG, "No network available")
+                    false
+                }
             }
         } else {
             @Suppress("DEPRECATION")
-            return connectivityManager.activeNetworkInfo?.isConnected ?: false
+            val activeNetwork = connectivityManager.activeNetworkInfo
+            val isConnected = activeNetwork?.isConnected == true
+            Log.d(TAG, "Legacy network check: isConnected=$isConnected")
+            return isConnected
         }
     }
 

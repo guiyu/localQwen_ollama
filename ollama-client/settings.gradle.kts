@@ -20,4 +20,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "sutra"
-include(":app")
+include(":app", ":models")
